@@ -2,7 +2,15 @@ defmodule Spigot.ProducerConsumer do
   use GenStage
 
   def start_link() do
-    GenStage.start_link(__MODULE__, :ok)
+    {:ok, pc} = GenStage.start_link(__MODULE__, :ok)
+
+    # In order to start handling events, a producer[-consumer] must have at
+    # least one consumer subscribed to it. This consumer triggers event handling
+    # and will not be dispatched any events.
+    {:ok, primer} = Spigot.Consumer.start_link(nil)
+    GenStage.sync_subscribe(primer, to: pc)
+
+    {:ok, pc}
   end
 
   def init(:ok) do
