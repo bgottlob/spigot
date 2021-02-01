@@ -6,7 +6,7 @@ defmodule A do
   end
 
   def init(counter) do
-    {:producer, counter, dispatcher: Spigot.KeyedDispatcher}
+    {:producer, counter}
   end
 
   def handle_demand(demand, counter) when demand > 0 do
@@ -22,32 +22,12 @@ defmodule A do
   end
 end
 
-defmodule C do
-  use GenStage
-
-  def start_link(_opts) do
-    GenStage.start_link(C, :ok)
-  end
-
-  def init(:ok) do
-    {:consumer, :the_state_does_not_matter}
-  end
-
-  def handle_events(events, _from, state) do
-    # Wait for a second.
-    Process.sleep(1000)
-
-    # Inspect the events.
-    IO.inspect(events)
-
-    # We are a consumer, so we would never emit items.
-    {:noreply, [], state}
-  end
-end
-
 {:ok, a} = A.start_link(0)  # starting from zero
-{:ok, c} = C.start_link([]) # state does not matter
+{:ok, pc} = Spigot.ProducerConsumer.start_link() # state does not matter
+{:ok, dummy} = Spigot.Consumer.start_link("fake")
+IO.puts("Dummy pid #{inspect(dummy)}")
 
-GenStage.sync_subscribe(c, to: a, key: "odd")
+GenStage.sync_subscribe(pc, to: a)
+GenStage.sync_subscribe(dummy, to: pc)
 
 Process.sleep 5000
