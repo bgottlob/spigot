@@ -2,7 +2,7 @@ defmodule EvenOddProducer do
   use GenStage
 
   def start_link(number) do
-    GenStage.start_link(A, number)
+    GenStage.start_link(__MODULE__, number)
   end
 
   def init(counter) do
@@ -20,8 +20,25 @@ defmodule EvenOddProducer do
   end
 end
 
-{:ok, producer} = A.start_link(0)  # starting from zero
-{:ok, spigot} = Spigot.ProducerConsumer.start_link() # state does not matter
+defmodule EvenOddWorker do
+  @behaviour Spigot.Worker
+
+  require Logger
+
+  def init() do
+    {:ok, 0}
+  end
+
+  def handle_events(events, sum) do
+    Process.sleep(500)
+    sum = Enum.reduce(events, sum, fn x, acc -> x + acc end)
+    Logger.info("#{inspect(self())} adding #{inspect(events)} for sum #{sum}")
+    {:noreply, sum}
+  end
+end
+
+{:ok, producer} = EvenOddProducer.start_link(0)  # starting from zero
+{:ok, spigot} = Spigot.ProducerConsumer.start_link(EvenOddWorker) # state does not matter
 
 GenStage.sync_subscribe(spigot, to: producer)
 
