@@ -37,9 +37,9 @@ defmodule EvenOddWorker do
   end
 end
 
-{:ok, producer} = EvenOddProducer.start_link(0)  # starting from zero
-{:ok, spigot} = Spigot.ProducerConsumer.start_link(EvenOddWorker) # state does not matter
-
-GenStage.sync_subscribe(spigot, to: producer)
-
-Process.sleep 5000
+#{:ok, producer} = EvenOddProducer.start_link(0)  # starting from zero
+#{:ok, spigot} = Spigot.ProducerConsumer.start_link(EvenOddWorker) # state does not matter
+#
+#GenStage.sync_subscribe(spigot, to: producer)
+#
+#Process.sleep 5000
