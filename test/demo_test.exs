@@ -29,17 +29,44 @@ defmodule EvenOddWorker do
     {:ok, 0}
   end
 
-  def handle_events(events, sum) do
+  def handle_event(event, sum) do
     Process.sleep(500)
-    sum = Enum.reduce(events, sum, fn x, acc -> x + acc end)
+    Logger.info("#{inspect(self())} adding #{inspect(event)} for sum #{sum}")
+    sum = sum + event
+    {:ignore, sum}
+  end
+end
+
+defmodule EvenOddTriggeredWorker do
+  @behaviour Spigot.Worker
+
+  require Logger
+
+  def init() do
+    {:ok, 0}
+  end
+
+  def handle_event(event, sum) do
+    Process.sleep(500)
+    case rem(event, 3) do
+      0 -> {:fire_trigger, sum}
+      _ -> {:continue, sum}
+    end
+  end
+
+  def trigger(events, sum) do
     Logger.info("#{inspect(self())} adding #{inspect(events)} for sum #{sum}")
-    {:noreply, sum}
+    sum = Enum.reduce(events, sum, fn x, acc -> x + acc end)
+    {:ok, sum}
   end
 end
 
 {:ok, producer} = EvenOddProducer.start_link(0)  # starting from zero
-{:ok, spigot} = Spigot.ProducerConsumer.start_link(EvenOddWorker) # state does not matter
-
+{:ok, spigot} = Spigot.ProducerConsumer.start_link(EvenOddWorker)
 GenStage.sync_subscribe(spigot, to: producer)
+
+{:ok, producer_triggered} = EvenOddProducer.start_link(0)  # starting from zero
+{:ok, spigot_triggered} = Spigot.ProducerConsumer.start_link(EvenOddTriggeredWorker)
+GenStage.sync_subscribe(spigot_triggered, to: producer_triggered)
 
 Process.sleep 5000
