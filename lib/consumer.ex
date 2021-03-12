@@ -7,30 +7,42 @@ defmodule Spigot.Consumer do
 
   def init(mod) do
     {:ok, state} = mod.init()
-    {:consumer, {mod, state, []}}
+    {:producer_consumer, {mod, state, []}}
   end
 
   def handle_events(events, _from, {mod, state, window_buffer}) do
-    {new_state, new_window_buffer} = handle_events(events, mod, state, window_buffer)
-    {:noreply, [], {mod, new_state, new_window_buffer}}
+    {new_state, new_window_buffer, new_to_dispatch} =
+      handle_events(events, mod, state, window_buffer, [])
+    {:noreply,
+      new_to_dispatch,
+      {mod, new_state, new_window_buffer}}
   end
 
-  defp handle_events([], _mod, state, window_buffer), do: {state, window_buffer}
-  defp handle_events([event | rest], mod, state, window_buffer) do
-    {new_state, window_buffer} = case mod.handle_event(event, state) do
-      {:fire_trigger, new_state} ->
+  defp handle_events([], _mod, state, window_buffer, dispatch_buffer) do
+    {state, window_buffer, dispatch_buffer |> Enum.reverse |> List.flatten}
+  end
+
+  defp handle_events([event | rest], mod, state, window_buffer, dispatch_buffer) do
+    {new_state, to_sink, window_buffer} = case mod.handle_event(event, state) do
+      {:fire_trigger, to_sink_handler, new_state} ->
         # Perform trigger for events in window
-        {:ok, new_state} = mod.trigger(Enum.reverse([event | window_buffer]), new_state)
+        {:ok, to_sink_trigger, new_state} = mod.trigger(Enum.reverse([event | window_buffer]), new_state)
         # Handle next event and start a new window
-        {new_state, []}
-      {:continue, new_state} ->
+        {new_state, [to_sink_handler, to_sink_trigger], []}
+      {:continue, to_sink_handler, new_state} ->
         # Buffer this event
-        {new_state, [event | window_buffer]}
-      {:ignore, new_state} ->
+        {new_state, to_sink_handler, [event | window_buffer]}
+      {:ignore, to_sink_handler, new_state} ->
         # Do not buffer this event
-        {new_state, window_buffer}
+        {new_state, to_sink_handler, window_buffer}
     end
 
-    handle_events(rest, mod, new_state, window_buffer)
+    handle_events(
+      rest,
+      mod,
+      new_state,
+      window_buffer,
+      [to_sink | dispatch_buffer]
+    )
   end
 end
