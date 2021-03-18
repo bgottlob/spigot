@@ -27,7 +27,7 @@ defmodule Spigot.ProducerConsumer do
           {:ok, consumer} = Spigot.Consumer.start_link(worker_mod)
           Logger.debug("Creating new consumer #{inspect(consumer)} to handle key #{key}")
           GenStage.sync_subscribe(consumer, to: self(), key: key)
-          GenStage.sync_subscribe(sink, to: consumer)
+          GenStage.sync_subscribe(sink, to: consumer, max_demand: 5)
           MapSet.put(acc, key)
       end
     end)

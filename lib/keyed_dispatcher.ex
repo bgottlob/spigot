@@ -36,23 +36,32 @@ defmodule Spigot.KeyedDispatcher do
   end
 
   def dispatch(events, _length, subscribers) do
-    # TODO this can be done in one pass of the events list
-    leftovers = Enum.filter(events, fn {key, _event_data} ->
+    {to_dispatch, leftovers} = Enum.split_with(events, fn {key, _event_data} ->
       case Map.get(subscribers, key) do
-        nil -> true
-        {_process, demand} when demand < 1 -> true
-        _ -> false
+        nil -> false
+        {_subscriber, demand} when demand < 1 -> false
+        _ -> true
       end
     end)
 
-    Enum.filter(events, fn {key, _event_data} -> Map.get(subscribers, key) != nil end)
-    |> Enum.reduce(subscribers, fn({key, event_data}, acc) ->
-      {{pid, ref}, demand} = Map.get(acc, key)
-      Process.send(pid, {:"$gen_consumer", {self(), ref}, [event_data]}, [:noconnect])
-      Map.put(acc, key, {{pid, ref}, demand - 1})
+    events_by_subscriber = Enum.group_by(to_dispatch, fn {key, event_data} ->
+      Map.fetch!(subscribers, key)
     end)
+    
+    subscriber_updates =
+      events_by_subscriber
+      |> Enum.map(fn({{{pid, ref} = subscriber, demand}, events_to_dispatch}) ->
+        {key, _event_data} = hd(events_to_dispatch)
+        events_to_dispatch = Enum.map(
+          events_to_dispatch,
+          fn {_key, event_data} -> event_data end
+        )
+        Process.send(pid, {:"$gen_consumer", {self(), ref}, events_to_dispatch}, [:noconnect])
+        {key, {subscriber, demand - length(events_to_dispatch)}}
+      end)
+      |> Enum.reduce(%{}, fn {key, subscriber}, acc -> Map.put(acc, key, subscriber) end)
 
-    {:ok, leftovers, subscribers}
+    {:ok, leftovers, Map.merge(subscribers, subscriber_updates)}
   end
 
   def cancel(from, subscribers) do
