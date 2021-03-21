@@ -76,7 +76,7 @@ defmodule Spigot.KeyedDispatcher do
 
   def info(msg, state) do
     Logger.error(
-      "Unrecognized message #{IO.inspect(msg)} received. Ignoring."
+      "Unrecognized message #{inspect(msg)} received. Ignoring."
     )
     {:ok, state}
   end

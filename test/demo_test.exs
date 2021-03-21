@@ -10,9 +10,9 @@ defmodule EvenOddProducer do
   end
 
   def handle_demand(demand, counter) when demand > 0 do
-    events = Enum.map( counter..counter+demand-1,
+    events = Enum.map(counter..counter + demand - 1,
       fn num when rem(num, 2) == 0 -> {"even", num}
-	 num -> {"odd", num}
+        num -> {"odd", num}
       end
     )
     {:noreply, events, counter + demand}
