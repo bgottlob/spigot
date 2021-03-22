@@ -1,4 +1,4 @@
-defmodule EvenOddProducer do
+defmodule Counter do
   use GenStage
 
   def start_link(number) do
@@ -10,11 +10,7 @@ defmodule EvenOddProducer do
   end
 
   def handle_demand(demand, counter) when demand > 0 do
-    events = Enum.map(counter..counter + demand - 1,
-      fn num when rem(num, 2) == 0 -> {"even", num}
-        num -> {"odd", num}
-      end
-    )
+    events = Enum.to_list(counter..counter + demand - 1)
     {:noreply, events, counter + demand}
   end
 end
@@ -79,14 +75,25 @@ defmodule SumSink do
   end
 end
 
-{:ok, producer} = EvenOddProducer.start_link(0)  # starting from zero
-{:ok, sink} = SumSink.start_link()
-{:ok, spigot} = Spigot.ProducerConsumer.start_link(EvenOddWorker, sink)
-GenStage.sync_subscribe(spigot, to: producer)
+partitioner = fn
+  event when rem(event, 2) == 0 -> "even"
+  _                             -> "odd"
+end
 
-{:ok, producer_triggered} = EvenOddProducer.start_link(0)  # starting from zero
+{:ok, producer} = Counter.start_link(0) # starting from zero
+{:ok, sink} = SumSink.start_link()
+
+Spigot.from_stages([producer])
+|> Spigot.partition(partitioner)
+|> Spigot.worker_module(EvenOddWorker)
+|> Spigot.into_stages([sink])
+
+{:ok, producer_triggered} = Counter.start_link(10) # starting from ten
 {:ok, sink_triggered} = SumSink.start_link()
-{:ok, spigot_triggered} = Spigot.ProducerConsumer.start_link(EvenOddTriggeredWorker, sink_triggered)
-GenStage.sync_subscribe(spigot_triggered, to: producer_triggered)
+
+Spigot.from_stages([producer_triggered])
+|> Spigot.partition(partitioner)
+|> Spigot.worker_module(EvenOddWorker)
+|> Spigot.into_stages([sink_triggered])
 
 Process.sleep 5000

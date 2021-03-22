@@ -3,8 +3,8 @@ defmodule Spigot.ProducerConsumer do
 
   require Logger
 
-  def start_link(worker_mod, sink) do
-    {:ok, pc} = GenStage.start_link(__MODULE__, {worker_mod, sink})
+  def start_link(worker_mod, partitioner, sink) do
+    {:ok, pc} = GenStage.start_link(__MODULE__, {worker_mod, partitioner, sink})
 
     # In order to start handling events, a producer[-consumer] must have at
     # least one consumer subscribed to it. This consumer triggers event handling
@@ -15,11 +15,12 @@ defmodule Spigot.ProducerConsumer do
     {:ok, pc}
   end
 
-  def init({worker_mod, sink}) do
-    {:producer_consumer, {MapSet.new(), worker_mod, sink}, dispatcher: Spigot.KeyedDispatcher}
+  def init({worker_mod, partitioner, sink}) do
+    {:producer_consumer, {MapSet.new(), worker_mod, partitioner, sink}, dispatcher: Spigot.KeyedDispatcher}
   end
 
-  def handle_events(events, _from, {key_set, worker_mod, sink}) do
+  def handle_events(events, _from, {key_set, worker_mod, partitioner, sink}) do
+    events = Enum.map(events, fn e -> {partitioner.(e), e} end)
     key_set = Enum.reduce(events, key_set, fn {key, _data}, acc ->
       case MapSet.member?(acc, key) do
         true -> acc
@@ -31,6 +32,6 @@ defmodule Spigot.ProducerConsumer do
           MapSet.put(acc, key)
       end
     end)
-    {:noreply, events, {key_set, worker_mod, sink}}
+    {:noreply, events, {key_set, worker_mod, partitioner, sink}}
   end
 end
