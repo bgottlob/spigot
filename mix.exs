@@ -22,7 +22,8 @@ defmodule Spigot.MixProject do
   defp deps do
     [
       {:gen_stage, "~> 1.0"},
-      {:credo, "~> 1.5", only: [:dev], runtime: false}
+      {:credo, "~> 1.5", only: [:dev], runtime: false},
+      {:propcheck, "~> 1.3", only: [:test], runtime: false}
     ]
   end
 end
