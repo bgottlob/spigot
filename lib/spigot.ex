@@ -36,7 +36,7 @@ defmodule Spigot do
       spigot.partitioner,
       consumer
     )
-    GenStage.sync_subscribe(pc, to: spigot.source)
+    GenStage.sync_subscribe(pc, to: spigot.source, cancel: :transient)
     {:ok, pc}
   end
 end

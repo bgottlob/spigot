@@ -10,7 +10,7 @@ defmodule Spigot.ProducerConsumer do
     # least one consumer subscribed to it. This consumer triggers event handling
     # and will not be dispatched any events.
     {:ok, primer} = Spigot.Consumer.start_link(Spigot.PrimerWorker)
-    GenStage.sync_subscribe(primer, to: pc)
+    GenStage.sync_subscribe(primer, to: pc, cancel: :transient)
 
     {:ok, pc}
   end
@@ -26,9 +26,9 @@ defmodule Spigot.ProducerConsumer do
         true -> acc
         false ->
           {:ok, consumer} = Spigot.Consumer.start_link(worker_mod)
-          Logger.debug("Creating new consumer #{inspect(consumer)} to handle key #{key}")
-          GenStage.sync_subscribe(consumer, to: self(), key: key)
-          GenStage.sync_subscribe(sink, to: consumer, max_demand: 5)
+          Logger.debug("Creating new #{worker_mod} #{inspect(consumer)} to handle key #{key}")
+          GenStage.sync_subscribe(consumer, to: self(), key: key, cancel: :transient)
+          GenStage.sync_subscribe(sink, to: consumer, max_demand: 5, cancel: :transient)
           MapSet.put(acc, key)
       end
     end)
